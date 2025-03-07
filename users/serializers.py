@@ -23,3 +23,13 @@ class UserSerializer(serializers.ModelSerializer):
             role=validated_data['role']
         )
         return user
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'password']  # Include the fields you want to allow for update
+
+    def update(self, instance, validated_data):
+        password = validated_data.get('password', None)
+        if password:
+            instance.set_password(password)
+        return super().update(instance, validated_data)
