@@ -26,10 +26,15 @@ class UserSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'password']  # Include the fields you want to allow for update
+        fields = ['first_name', 'last_name', 'password']  # Include fields you want to update
 
     def update(self, instance, validated_data):
+        # Get the password field from validated data, if present
         password = validated_data.get('password', None)
+        
+        # If the password is provided, hash it before saving
         if password:
             instance.set_password(password)
+        
+        # Save the other fields
         return super().update(instance, validated_data)

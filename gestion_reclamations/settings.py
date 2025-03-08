@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # Pour créer des API REST
-    'users',  # Notre application pour la gestion des utilisateurs
+    'users', 
+    'reclamations',
    
 ]
 
