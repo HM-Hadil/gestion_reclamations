@@ -1,13 +1,20 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'email', 'password', 'role']
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ('id', 'first_name', 'last_name', 'email', 'role', 'image')
+
+    def get_image(self, obj):
+        if obj.image:
+            return settings.MEDIA_URL + str(obj.image)
+        return None
 
     def create(self, validated_data):
         # Générer un nom d'utilisateur à partir de l'email
@@ -26,15 +33,21 @@ class UserSerializer(serializers.ModelSerializer):
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'password']  # Include fields you want to update
+        fields = ['first_name', 'last_name', 'password', 'image']
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': False},  # Rendre le mot de passe optionnel
+            'image': {'required': False},  # Rendre l'image optionnelle
+        }
 
     def update(self, instance, validated_data):
-        # Get the password field from validated data, if present
-        password = validated_data.get('password', None)
-        
-        # If the password is provided, hash it before saving
+        # Gérer la mise à jour du mot de passe uniquement s'il est fourni
+        password = validated_data.pop('password', None)
         if password:
             instance.set_password(password)
-        
-        # Save the other fields
-        return super().update(instance, validated_data)
+
+        # Mettre à jour les autres champs
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance

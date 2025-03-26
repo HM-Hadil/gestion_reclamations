@@ -20,6 +20,7 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=150, blank=True)
     email = models.EmailField(unique=True, validators=[validate_isimg_email])
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, blank=True)
+    image = models.ImageField(upload_to='user_images/', null=True, blank=True)  # Ajout du champ image
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name', 'role']
