@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'rest_framework',  # Pour créer des API REST
     'users', 
     'reclamations',
+    'PasswordResetToken',
+    'gestion',
    
 ]
 
@@ -145,3 +147,12 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
+
+# Configurations pour l'envoi d'emails (à placer dans settings.py)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"  # Serveur SMTP de Gmail
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "hadilhammami314@gmail.com"  # Remplacez par votre adresse e-mail
+EMAIL_HOST_PASSWORD = "ruckspdgbrqjsnxh"
+DEFAULT_FROM_EMAIL = "hadilhammami314@gmail.com"

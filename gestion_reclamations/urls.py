@@ -6,7 +6,11 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),  # API Users
-    path('api/reclamations/', include('reclamations.urls')),  # API Réclamations
+    path('api/reclamations/', include('reclamations.urls')),  # API Réclamations,
+    path('reset-password/', include('PasswordResetToken.urls')),
+    path('api/', include('gestion.urls')),  # Inclure les URLs de l'application gestion
+
+
 ]
 
 # Ajout de la gestion des fichiers médias en dehors de la liste urlpatterns
