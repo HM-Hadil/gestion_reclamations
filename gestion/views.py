@@ -1,7 +1,8 @@
 from rest_framework import generics
 from .models import Salle, Laboratoire, Bureau
 from .serializers import SalleSerializer, LaboratoireSerializer, BureauSerializer
-
+from .models import PC
+from .serializers import PCSerializer
 # Liste et création des salles
 class SalleListCreateView(generics.ListCreateAPIView):
     queryset = Salle.objects.all()
@@ -31,3 +32,13 @@ class BureauListCreateView(generics.ListCreateAPIView):
 class BureauDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Bureau.objects.all()
     serializer_class = BureauSerializer
+# Liste et création des PC
+class PCListCreateView(generics.ListCreateAPIView):
+    queryset = PC.objects.all()
+    serializer_class = PCSerializer
+
+
+# Détail, modification et suppression d'un PC
+class PCDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = PC.objects.all()
+    serializer_class = PCSerializer

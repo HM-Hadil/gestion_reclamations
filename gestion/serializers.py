@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Salle, Laboratoire, Bureau
+from .models import PC, Salle, Laboratoire, Bureau
 
 class SalleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,3 +15,7 @@ class BureauSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bureau
         fields = '__all__'  # Cela inclut tous les champs du modèle Bureau
+class PCSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PC
+        fields = ['id', 'poste', 'sn_inventaire', 'logiciels_installes', 'ecran']

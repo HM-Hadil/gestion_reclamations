@@ -156,3 +156,6 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "hadilhammami314@gmail.com"  # Remplacez par votre adresse e-mail
 EMAIL_HOST_PASSWORD = "ruckspdgbrqjsnxh"
 DEFAULT_FROM_EMAIL = "hadilhammami314@gmail.com"
+
+
+AUTH_USER_MODEL = 'users.User'

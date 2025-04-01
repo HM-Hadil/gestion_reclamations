@@ -1,108 +1,115 @@
 from django.db import models
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
+from django.conf import settings
 
 class Laboratoire(models.Model):
-    nom = models.CharField(max_length=100)
-
+    """Représente un laboratoire spécifique"""
+    nom = models.CharField(max_length=100, unique=True, verbose_name='Nom du Laboratoire')
+    
     def __str__(self):
         return self.nom
 
+class Equipement(models.Model):
+    """Modèle pour gérer les équipements dans un laboratoire"""
+    laboratoire = models.ForeignKey(
+        Laboratoire, 
+        on_delete=models.CASCADE, 
+        related_name='equipements'
+    )
+    TYPE_CHOICES = [
+        ('pc', 'Ordinateur'),
+        ('electrique', 'Équipement Électrique'),
+        ('divers', 'Équipement Divers')
+    ]
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    identificateur = models.CharField(max_length=50, verbose_name="Identifiant de l'équipement")  # Fixed here
+    
+    def __str__(self):
+        return f"{self.identificateur} - {self.get_type_display()} ({self.laboratoire.nom})"
 
 class Reclamation(models.Model):
-    STATUT_CHOICES = [
-        ('en_attente', 'En attente'),
-        ('en_cours', 'En cours'),
-        ('termine', 'Terminé'),
-    ]
-
+    """Modèle principal pour les réclamations"""
     LIEU_CHOICES = [
         ('labo', 'Laboratoire'),
         ('salle', 'Salle'),
-        ('bureau', 'Bureau'),
+        ('bureau', 'Bureau')
     ]
 
-    description = models.TextField()
-    date_soumission = models.DateTimeField(auto_now_add=True)
-    date_modification = models.DateTimeField(auto_now=True)
-    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
-    lieu = models.CharField(max_length=20, choices=LIEU_CHOICES)  # Choix du lieu : labo, salle, bureau
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    CATEGORY_CHOICES = [
+        ('pc', 'Problèmes PC'),
+        ('electrique', 'Problèmes Électriques'),
+        ('divers', 'Problèmes Divers')
+    ]
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reclamations'
+    )
+    lieu = models.CharField(max_length=10, choices=LIEU_CHOICES)
+    laboratoire = models.ForeignKey(
+        Laboratoire, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    equipement = models.ForeignKey(
+        Equipement, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    category = models.CharField(
+        max_length=10, 
+        choices=CATEGORY_CHOICES, 
+        verbose_name='Catégorie',
+        null=True,  
+        blank=True  
+    )
+    date_creation = models.DateTimeField(auto_now_add=True)
+    description_generale = models.TextField(
+        blank=True, 
+        null=True, 
+        verbose_name='Description générale'
+    )
+    
     def __str__(self):
-        return f"Réclamation {self.lieu} de {self.user.email} - {self.statut}"
+        return f"Réclamation {self.id} - {self.get_lieu_display()} - {self.get_category_display() if self.category else 'Sans Catégorie'}"
 
 class ReclamationPC(models.Model):
-    PROBLEME_TYPE_CHOICES = [
-        ('materiel', 'Problème Matériel'),
-        ('logiciel', 'Problème Logiciel'),
-    ]
-
-    MATERIEL_CHOICES = [
-        ('clavier', 'Clavier'),
-        ('souris', 'Souris'),
-        ('ecran', 'Écran'),
-        ('imprimante', 'Imprimante'),
-        ('scanner', 'Scanner'),
-        ('carte_reseau', 'Carte Réseau'),
-    ]
-
-    LOGICIEL_CHOICES = [
-        ('connexion_internet', 'Connexion Internet'),
-        ('systeme_exploitation', 'Système d\'Exploitation'),
-        ('installation', 'Installation Logicielle'),
-        ('antivirus', 'Antivirus'),
-    ]
-
-    reclamation = models.OneToOneField(Reclamation, on_delete=models.CASCADE, primary_key=True)
-    type_probleme = models.CharField(max_length=20, choices=PROBLEME_TYPE_CHOICES)
-    materiel = models.CharField(max_length=20, choices=MATERIEL_CHOICES, null=True, blank=True)
-    logiciel = models.CharField(max_length=20, choices=LOGICIEL_CHOICES, null=True, blank=True)
-    details_probleme = models.TextField()
-
-    def __str__(self):
-        return f"Réclamation PC - {self.type_probleme}"
-
+    """Détails pour les réclamations liées aux ordinateurs"""
+    reclamation = models.OneToOneField(
+        Reclamation,
+        on_delete=models.CASCADE,
+        related_name='pc_details'
+    )
+    type_probleme = models.CharField(
+        max_length=20, 
+        choices=[('materiel', 'Problème Matériel'), ('logiciel', 'Problème Logiciel')]
+    )
+    description_probleme = models.TextField(null=True, blank=True)
 
 class ReclamationElectrique(models.Model):
-    PROBLEME_CHOICES = [
-        ('climatiseur', 'Climatiseur'),
-        ('coupure_courant', 'Coupure de Courant'),
-    ]
-
-    CLIMATISEUR_ETAT_CHOICES = [
-        ('dysfonctionnement_partiel', 'Dysfonctionnement Partiel'),
-        ('absence', 'Absence de Climatiseur'),
-        ('panne', 'Panne Complète'),
-    ]
-
-    reclamation = models.OneToOneField(Reclamation, on_delete=models.CASCADE, primary_key=True)
-    type_probleme = models.CharField(max_length=20, choices=PROBLEME_CHOICES)
-    etat_climatiseur = models.CharField(max_length=30, choices=CLIMATISEUR_ETAT_CHOICES, null=True, blank=True)
-    description_climatiseur = models.TextField(null=True, blank=True)
-    description_coupure = models.TextField(null=True, blank=True)
-
-    def __str__(self):
-        return f"Réclamation Électrique - {self.type_probleme}"
-
+    """Détails pour les réclamations électriques"""
+    reclamation = models.OneToOneField(
+        Reclamation,
+        on_delete=models.CASCADE,
+        related_name='electrique_details'
+    )
+    type_probleme = models.CharField(
+        max_length=20, 
+        choices=[('climatiseur', 'Climatiseur'), ('coupure_courant', 'Coupure de Courant'), ('autre', 'Autre')]
+    )
+    description_probleme = models.TextField(null=True, blank=True)
 
 class ReclamationDivers(models.Model):
-    PROBLEME_CHOICES = [
-        ('tableau_blanc', 'Tableau Blanc'),
-        ('video_projecteur', 'Vidéo Projecteur'),
-    ]
-
-    ETAT_CHOICES = [
-        ('dysfonctionnement_partiel', 'Dysfonctionnement Partiel'),
-        ('absence', 'Absence'),
-        ('panne', 'Panne Complète'),
-    ]
-
-    reclamation = models.OneToOneField(Reclamation, on_delete=models.CASCADE, primary_key=True)
-    type_probleme = models.CharField(max_length=30, choices=PROBLEME_CHOICES)
-    etat = models.CharField(max_length=30, choices=ETAT_CHOICES)
-    description = models.TextField()
-
-    def __str__(self):
-        return f"Réclamation Divers - {self.type_probleme}"
+    """Détails pour les réclamations diverses"""
+    reclamation = models.OneToOneField(
+        Reclamation,
+        on_delete=models.CASCADE,
+        related_name='divers_details'
+    )
+    type_probleme = models.CharField(
+        max_length=30, 
+        choices=[('tableau_blanc', 'Tableau Blanc'), ('video_projecteur', 'Vidéo Projecteur'), ('autre', 'Autre')]
+    )
+    description_probleme = models.TextField(null=True, blank=True)

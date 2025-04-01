@@ -4,7 +4,7 @@ from .views import (
     LaboratoireListCreateView, LaboratoireDetailView,
     BureauListCreateView, BureauDetailView
 )
-
+from .views import PCListCreateView, PCDetailView
 urlpatterns = [
     # URLs pour Salle
     path('salles/', SalleListCreateView.as_view(), name='salle-list-create'),
@@ -17,4 +17,9 @@ urlpatterns = [
     # URLs pour Bureau
     path('bureaux/', BureauListCreateView.as_view(), name='bureau-list-create'),
     path('bureaux/<int:pk>/', BureauDetailView.as_view(), name='bureau-detail'),
+
+      # Liste et création des PC
+    path('pc/', PCListCreateView.as_view(), name='pc-list-create'),
+    # Détail, mise à jour et suppression d'un PC
+    path('pc/<int:pk>/', PCDetailView.as_view(), name='pc-detail'),
 ]
