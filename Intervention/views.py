@@ -12,7 +12,7 @@ from weasyprint import HTML
 import tempfile
 
 from .models import Intervention, Reclamation
-from .serializers import InterventionSerializer, RapportInterventionSerializer
+from .serializer import InterventionSerializer, RapportInterventionSerializer
 
 class InterventionViewSet(viewsets.ModelViewSet):
     """
