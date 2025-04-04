@@ -2,6 +2,8 @@ from rest_framework import viewsets, generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
 
 from .models import (
     Reclamation, 
@@ -166,3 +168,77 @@ class ReclamationDiversViewSet(viewsets.ModelViewSet):
     queryset = ReclamationDivers.objects.all()
     serializer_class = ReclamationDiversSerializer
     permission_classes = [IsAuthenticated]
+class UserReclamationsView(generics.ListAPIView):
+    """
+    Liste toutes les réclamations d'un utilisateur spécifique
+    avec possibilité de filtrer par statut
+    """
+    serializer_class = ReclamationSerializer
+    def get_queryset(self):
+        user_id = self.kwargs.get('user_id')
+        status_filter = self.request.query_params.get('status', None)
+        
+        queryset = Reclamation.objects.filter(user_id=user_id)
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+            
+        return queryset.order_by('-date_creation')
+
+
+class ReclamationsEnAttenteView(generics.ListAPIView):
+    """
+    Liste toutes les réclamations avec statut 'en_attente'
+    """
+    serializer_class = ReclamationSerializer
+    queryset = Reclamation.objects.filter(status='en_attente').order_by('-date_creation')
+
+class ReclamationsEnCoursView(generics.ListAPIView):
+    """
+    Liste toutes les réclamations avec statut 'en_cours'
+    """
+    serializer_class = ReclamationSerializer
+    queryset = Reclamation.objects.filter(status='en_cours').order_by('-date_creation')
+
+class ReclamationsTermineesView(generics.ListAPIView):
+    """
+    Liste toutes les réclamations avec statut 'termine'
+    """
+    serializer_class = ReclamationSerializer
+    queryset = Reclamation.objects.filter(status='termine').order_by('-date_creation')
+
+class DeleteReclamationView(APIView):
+    """
+    Supprime une réclamation par son ID
+    """
+    def delete(self, request, reclamation_id):
+        reclamation = get_object_or_404(Reclamation, id=reclamation_id)
+        
+        # Vérifiez si l'utilisateur est autorisé à supprimer cette réclamation
+        # Exemple: administrateur ou propriétaire de la réclamation
+        if request.user.is_staff or reclamation.user == request.user:
+            reclamation.delete()
+            return Response({"message": "Réclamation supprimée avec succès"}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({"error": "Vous n'êtes pas autorisé à supprimer cette réclamation"}, 
+                            status=status.HTTP_403_FORBIDDEN)
+
+class UserReclamationsByStatusView(generics.ListAPIView):
+    """
+    Liste les réclamations d'un utilisateur spécifique filtrées par statut
+    """
+    serializer_class = ReclamationSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user_id = self.kwargs.get('user_id')
+        status_value = self.kwargs.get('status')
+        
+        # Vérifier si le statut est valide
+        if status_value not in [choice[0] for choice in Reclamation.STATUS_CHOICES]:
+            return Reclamation.objects.none()
+            
+        return Reclamation.objects.filter(
+            user_id=user_id,
+            status=status_value
+        ).order_by('-date_creation')

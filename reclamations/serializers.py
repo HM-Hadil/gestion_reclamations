@@ -65,7 +65,8 @@ class ReclamationSerializer(serializers.ModelSerializer):
         fields = '__all__'
         extra_kwargs = {
             'description_generale': {'required': False},
-            'lieu_specifique': {'required': True}
+            'lieu_specifique': {'required': True},
+            'status': {'required': False} 
         }
 
     def create(self, validated_data):

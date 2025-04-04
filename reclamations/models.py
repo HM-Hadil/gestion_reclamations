@@ -40,6 +40,13 @@ class Reclamation(models.Model):
         ('divers', 'Problèmes Divers')
     ]
 
+     
+    STATUS_CHOICES = [
+        ('en_attente', 'En attente'),
+        ('en_cours', 'En cours'),
+        ('termine', 'Terminé'),
+    ]
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -64,6 +71,12 @@ class Reclamation(models.Model):
         verbose_name='Catégorie',
         null=True,  
         blank=True  
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='en_attente',
+        verbose_name='Statut'
     )
     date_creation = models.DateTimeField(auto_now_add=True)
     description_generale = models.TextField(

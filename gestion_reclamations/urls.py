@@ -9,7 +9,7 @@ urlpatterns = [
     path('api/reclamations/', include('reclamations.urls')),
     path('reset-password/', include('PasswordResetToken.urls')),
     path('api/', include('gestion.urls')),  # Inclure les URLs de l'application gestion
-
+     path('api/', include('Intervention.urls')), 
 
 ]
 
