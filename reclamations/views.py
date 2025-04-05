@@ -242,3 +242,5 @@ class UserReclamationsByStatusView(generics.ListAPIView):
             user_id=user_id,
             status=status_value
         ).order_by('-date_creation')
+    
+

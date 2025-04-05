@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import Intervention, Reclamation
-
+from .models import Intervention
+from reclamations.models import Reclamation
 class InterventionSerializer(serializers.ModelSerializer):
     """
     Serializer pour le modèle Intervention
@@ -15,14 +15,37 @@ class InterventionSerializer(serializers.ModelSerializer):
     
     def get_reclamation_details(self, obj):
         """Retourne les détails de la réclamation liée"""
-        return {
-            'id': obj.reclamation.id,
-            'category': obj.reclamation.get_category_display(),
-            'lieu': obj.reclamation.get_lieu_display(),
-            'laboratoire': obj.reclamation.laboratoire.nom if obj.reclamation.laboratoire else None,
-            'description_generale': obj.reclamation.description_generale,
-            'date_creation': obj.reclamation.date_creation
+        reclamation = obj.reclamation
+        
+        # Données de base
+        details = {
+            'id': reclamation.id,
+            'category': reclamation.get_category_display(),
+            'lieu': reclamation.get_lieu_display(),
+            'laboratoire': reclamation.laboratoire.nom if reclamation.laboratoire else None,
+            'description_generale': reclamation.description_generale,
+            'date_creation': reclamation.date_creation,
+            'status': reclamation.get_status_display()
         }
+        
+        # Ajouter les détails spécifiques selon la catégorie
+        if reclamation.category == 'pc' and hasattr(reclamation, 'pc_details'):
+            details['details_specifiques'] = {
+                'type_probleme': reclamation.pc_details.type_probleme,
+                'description_probleme': reclamation.pc_details.description_probleme
+            }
+        elif reclamation.category == 'electrique' and hasattr(reclamation, 'electrique_details'):
+            details['details_specifiques'] = {
+                'type_probleme': reclamation.electrique_details.type_probleme,
+                'description_probleme': reclamation.electrique_details.description_probleme
+            }
+        elif reclamation.category == 'divers' and hasattr(reclamation, 'divers_details'):
+            details['details_specifiques'] = {
+                'type_probleme': reclamation.divers_details.type_probleme,
+                'description_probleme': reclamation.divers_details.description_probleme
+            }
+            
+        return details
     
     def get_technicien_nom(self, obj):
         """Retourne le nom complet du technicien"""
@@ -32,20 +55,18 @@ class InterventionSerializer(serializers.ModelSerializer):
         """Validation personnalisée"""
         # Vérifier que la réclamation n'est pas déjà terminée
         reclamation = data.get('reclamation')
-        if reclamation.status == 'termine':
+        if reclamation and reclamation.status == 'termine':
             raise serializers.ValidationError("Cette réclamation est déjà terminée")
         
         return data
 
+
+# Add this class to your serializer.py file
 class RapportInterventionSerializer(serializers.Serializer):
     """
-    Serializer pour générer un rapport d'intervention à partir d'une intervention existante
+    Serializer for generating intervention reports
     """
-    intervention_id = serializers.IntegerField()
-    
-    def validate_intervention_id(self, value):
-        """Vérifier que l'intervention existe"""
-        try:
-            return Intervention.objects.get(id=value)
-        except Intervention.DoesNotExist:
-            raise serializers.ValidationError("Cette intervention n'existe pas")
+    intervention_id = serializers.PrimaryKeyRelatedField(
+        queryset=Intervention.objects.all(),
+        help_text="ID of the intervention to generate a report for"
+    )

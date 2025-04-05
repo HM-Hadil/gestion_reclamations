@@ -1,7 +1,7 @@
 from django.db import models
-
 from gestion_reclamations import settings
-from reclamations.models import Reclamation
+from reclamations.models import Reclamation  # Import Reclamation from reclamations app, not from .models
+
 class Intervention(models.Model):
     """Modèle pour gérer les interventions sur les réclamations"""
     reclamation = models.ForeignKey(
@@ -30,6 +30,24 @@ class Intervention(models.Model):
         null=True,
         blank=True
     )
+    
+    # Nouveaux champs pour le rapport d'intervention
+    probleme_constate = models.TextField(blank=True, null=True, 
+        help_text="Description détaillée du problème constaté lors de l'intervention")
+    analyse_cause = models.TextField(blank=True, null=True,
+        help_text="Analyse et cause identifiée du problème")
+    actions_entreprises = models.TextField(blank=True, null=True,
+        help_text="Actions entreprises pour résoudre le problème")
+    pieces_remplacees = models.TextField(blank=True, null=True,
+        help_text="Liste des pièces remplacées pendant l'intervention")
+    resultat_tests = models.TextField(blank=True, null=True,
+        help_text="Résultats des tests effectués après l'intervention")
+    recommandations = models.TextField(blank=True, null=True,
+        help_text="Recommandations pour éviter que le problème ne se reproduise")
+    mots_cles = models.CharField(max_length=255, blank=True, null=True,
+        help_text="Mots-clés pour faciliter la recherche d'interventions similaires")
+    fichier_joint = models.FileField(upload_to='interventions/', blank=True, null=True,
+        help_text="Fichier joint à l'intervention (photos, diagnostics, etc.)")
     
     def __str__(self):
         return f"Intervention #{self.id} - Réclamation #{self.reclamation.id}"
