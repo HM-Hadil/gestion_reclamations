@@ -19,7 +19,8 @@ class User(AbstractUser):
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
     email = models.EmailField(unique=True, validators=[validate_isimg_email])
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, blank=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES,
+    default='enseignant', blank=True)
     image = models.ImageField(upload_to='user_images/', null=True, blank=True)  # Ajout du champ image
 
     USERNAME_FIELD = 'email'

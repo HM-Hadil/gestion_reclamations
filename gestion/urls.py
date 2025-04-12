@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     SalleListCreateView, SalleDetailView,
     LaboratoireListCreateView, LaboratoireDetailView,
-    BureauListCreateView, BureauDetailView
+    BureauListCreateView, BureauDetailView,PCsByLaboratoireView
 )
 from .views import PCListCreateView, PCDetailView
 urlpatterns = [
@@ -13,6 +13,8 @@ urlpatterns = [
     # URLs pour Laboratoire
     path('laboratoires/', LaboratoireListCreateView.as_view(), name='laboratoire-list-create'),
     path('laboratoires/<int:pk>/', LaboratoireDetailView.as_view(), name='laboratoire-detail'),
+    path('laboratoires/<int:laboratoire_id>/pcs/', PCsByLaboratoireView.as_view(), name='laboratoire-pcs'),
+
 
     # URLs pour Bureau
     path('bureaux/', BureauListCreateView.as_view(), name='bureau-list-create'),

@@ -37,7 +37,13 @@ class PCListCreateView(generics.ListCreateAPIView):
     queryset = PC.objects.all()
     serializer_class = PCSerializer
 
-
+# Liste des PCs par laboratoire
+class PCsByLaboratoireView(generics.ListAPIView):
+    serializer_class = PCSerializer
+    
+    def get_queryset(self):
+        laboratoire_id = self.kwargs['laboratoire_id']
+        return PC.objects.filter(laboratoire_id=laboratoire_id)
 # Détail, modification et suppression d'un PC
 class PCDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = PC.objects.all()
