@@ -1,5 +1,7 @@
 from django.db import models
 
+from reclamations.models import Laboratoire
+
 # Modèle Salle
 class Salle(models.Model):
     nom = models.CharField(max_length=100)
@@ -7,12 +9,16 @@ class Salle(models.Model):
     def __str__(self):
         return self.nom
 
-# Modèle Laboratoire
-class Laboratoire(models.Model):
+# Modèle Laboratoireclass Laboratoire(models.Model):
     nom = models.CharField(max_length=100)
-
+    modele_postes = models.CharField(max_length=200, verbose_name="Modèle des postes", blank=True)
+    processeur = models.CharField(max_length=200, verbose_name="Processeur", blank=True)
+    memoire_ram = models.CharField(max_length=100, verbose_name="Mémoire RAM", blank=True)
+    stockage = models.CharField(max_length=100, verbose_name="Stockage", blank=True)
+    
     def __str__(self):
         return self.nom
+
 
 # Modèle Bureau
 class Bureau(models.Model):
