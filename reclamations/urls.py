@@ -14,7 +14,8 @@ from .views import (
     ReclamationsEnCoursView,
     ReclamationsTermineesView,
     DeleteReclamationView,
-    UserReclamationsByStatusView
+    UserReclamationsByStatusView,
+    AnalyseStatistiqueView
 
 )
 
@@ -31,7 +32,8 @@ urlpatterns = [
     path('', ReclamationListView.as_view(), name='reclamation-list'),
     path('filter/', ReclamationFilterView.as_view(), name='reclamation-filter'),
     path('statistics/', ReclamationStatisticsView.as_view(), name='reclamation-statistics'),
-    
+    path('analyse-statistique/', AnalyseStatistiqueView.as_view(), name='analyse-statistique'),
+
 
     path('user/<int:user_id>/', UserReclamationsView.as_view(), name='user-reclamations'),
     path('status/en-attente/', ReclamationsEnAttenteView.as_view(), name='reclamations-en-attente'),

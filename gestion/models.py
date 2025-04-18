@@ -43,11 +43,11 @@ class PC(models.Model):
     
     # Ajout de la relation avec le laboratoire (ForeignKey)
     laboratoire = models.ForeignKey(
-        Laboratoire, 
-        on_delete=models.SET_NULL,  # Si le laboratoire est supprimé, les PCs restent mais sans labo attribué
-        null=True, 
+        Laboratoire,  # Assurez-vous que c'est le bon modèle
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-        related_name='pcs',  # Pour pouvoir accéder aux PCs depuis un laboratoire
+        related_name='pcs',
         verbose_name="Laboratoire"
     )
     

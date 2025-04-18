@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import PC, Salle, Laboratoire, Bureau
+from gestion.models import PC, Salle, Laboratoire, Bureau
+from reclamations.models import Laboratoire
+
 
 class SalleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,9 +17,6 @@ class LaboratoireSerializer(serializers.ModelSerializer):
     class Meta:
         model = Laboratoire
         fields = ['id', 'nom', 'modele_postes', 'processeur', 'memoire_ram', 'stockage', 'pcs']
-    class Meta:
-        model = Laboratoire
-        fields = '__all__'
 
 class BureauSerializer(serializers.ModelSerializer):
     class Meta:
