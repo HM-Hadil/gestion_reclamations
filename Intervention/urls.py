@@ -1,14 +1,12 @@
+# urls.py - Configuration des URLs améliorée
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    # Vues existantes
+    CompleteInterventionReportView,
     InterventionViewSet,
     UserInterventionsView,
-    FinirInterventionView,
-    GenererRapportView,
-    # Nouvelles vues
-    UpdateReclamationStatusView,
-    CreateInterventionView
+    CreateInterventionView,
 )
 
 # Router pour les viewsets
@@ -16,15 +14,16 @@ router = DefaultRouter()
 router.register('interventions', InterventionViewSet)
 
 urlpatterns = [
-    # URLs existantes
+    # URL pour obtenir les interventions d'un utilisateur spécifique
     path('interventions/user/<int:user_id>/', UserInterventionsView.as_view(), name='user-interventions'),
-    path('interventions/<int:intervention_id>/terminer/', FinirInterventionView.as_view(), name='terminer-intervention'),
-    path('interventions/rapport/', GenererRapportView.as_view(), name='generer-rapport'),
     
-    # Nouvelles URLs
-    path('reclamations/<int:reclamation_id>/update-status/', UpdateReclamationStatusView.as_view(), name='update-reclamation-status'),
-    path('reclamations/<int:reclamation_id>/create-intervention/', CreateInterventionView.as_view(), name='create-intervention'),
+    # URL pour compléter le rapport d'intervention (terminer l'intervention et générer/télécharger le PDF)
+    path('interventions/<int:pk>/complete-report/', CompleteInterventionReportView.as_view(), name='intervention-complete-report'),
     
-    # Inclure les routes du router
-    path('', include(router.urls))
+    # URL pour créer une intervention (deux versions, avec et sans ID de réclamation dans l'URL)
+    path('interventions/create/', CreateInterventionView.as_view(), name='create-intervention'),
+    path('interventions/create/<int:reclamation_id>/', CreateInterventionView.as_view(), name='create-intervention-with-id'),
+    
+    # Inclure les routes du router pour les opérations CRUD standard
+    path('', include(router.urls)),
 ]

@@ -38,7 +38,7 @@ class ForgotPasswordView(APIView):
         )
         
         # URL de réinitialisation
-        reset_link = f"http://127.0.0.1:8000/reset-password/{token}/"
+        reset_link = f"http://localhost:4200/reset-password/{token}/"
         
         # Envoyer l'email
         send_mail(

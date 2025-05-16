@@ -8,7 +8,6 @@ from .serializers import UserSerializer, UserUpdateSerializer
 from django.contrib.auth import get_user_model
 from rest_framework.generics import UpdateAPIView
 
-
 User = get_user_model()
 
 # Inscription (Registration)
@@ -20,12 +19,12 @@ class RegisterView(generics.CreateAPIView):
 # Connexion (Login)
 class LoginView(generics.GenericAPIView):
     permission_classes = [AllowAny]
-
+    
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
         user = authenticate(username=email, password=password)
-
+        
         if user:
             refresh = RefreshToken.for_user(user)
             return Response({
@@ -38,24 +37,27 @@ class LoginView(generics.GenericAPIView):
 class UserDetailView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-
+    
     def get_queryset(self):
         return User.objects.filter(id=self.request.user.id)
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        return context
 
 # Update user view
-
 class UserUpdateView(UpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserUpdateSerializer
     permission_classes = [IsAuthenticated]
-
+    
     def get_object(self):
         return self.request.user  # Permet à l'utilisateur connecté de s'auto-modifier
-
+    
     def patch(self, request, *args, **kwargs):
         user = self.get_object()
         serializer = self.get_serializer(user, data=request.data, partial=True)
-
+        
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)

@@ -56,7 +56,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # Pour créer des API REST
+    'drf_yasg',
     'users', 
+       'corsheaders',
     'reclamations',
     'PasswordResetToken',
     'gestion',
@@ -72,7 +74,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:4200",
+]
+
 
 ROOT_URLCONF = 'gestion_reclamations.urls'
 
@@ -106,6 +114,7 @@ DATABASES = {
         'PASSWORD': 'gitan',
         'HOST': 'localhost',
         'PORT': '5432',
+     
     }
 }
 

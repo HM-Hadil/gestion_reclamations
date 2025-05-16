@@ -1,227 +1,228 @@
-from django.shortcuts import render, get_object_or_404
+import io
+import os
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+
 from rest_framework import generics, viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from django.http import HttpResponse
-from django.template.loader import render_to_string
+# from rest_framework_simplejwt.authentication import JWTAuthentication
+
 from weasyprint import HTML
-import tempfile
-from rest_framework_simplejwt.authentication import JWTAuthentication
-import io
+
 from .models import Intervention
 from reclamations.models import Reclamation
+from .serializer import InterventionSerializer, InterventionReportDataSerializer
 from reclamations.serializers import ReclamationSerializer
-from .serializer import InterventionSerializer, RapportInterventionSerializer
 
+User = get_user_model()
 
-from .serializer import InterventionSerializer
+def generate_intervention_pdf(intervention: Intervention):
+    """
+    Génère le PDF du rapport d'intervention et le retourne en tant que ContentFile
+    """
+    context = {
+        'intervention': intervention,
+        'date_rapport': timezone.now().strftime('%d/%m/%Y %H:%M'),
+        'technicien_nom': f"{intervention.technicien.first_name} {intervention.technicien.last_name}" if intervention.technicien else "N/A",
+        'reclamation': intervention.reclamation,
+        'date_debut': intervention.date_debut.strftime('%d/%m/%Y %H:%M') if intervention.date_debut else 'N/A',
+        'date_fin': intervention.date_fin.strftime('%d/%m/%Y %H:%M') if intervention.date_fin else 'En cours',
+        'reclamation_details_specific': None
+    }
 
-from .serializer import InterventionSerializer, RapportInterventionSerializer
+    reclamation = intervention.reclamation
+    details_specific = {}
+
+    if reclamation.category == 'pc' and hasattr(reclamation, 'pc_details'):
+        try:
+            pc_details = reclamation.pc_details
+            details_specific = {
+                'type_probleme': pc_details.type_probleme,
+                'description_probleme': pc_details.description_probleme
+            }
+        except Reclamation.pc_details.RelatedObjectDoesNotExist:
+            pass
+
+    elif reclamation.category == 'electrique' and hasattr(reclamation, 'electrique_details'):
+        try:
+            electrique_details = reclamation.electrique_details
+            details_specific = {
+                'type_probleme': electrique_details.type_probleme,
+                'description_probleme': electrique_details.description_probleme
+            }
+        except Reclamation.electrique_details.RelatedObjectDoesNotExist:
+            pass
+
+    elif reclamation.category == 'divers' and hasattr(reclamation, 'divers_details'):
+        try:
+            divers_details = reclamation.divers_details
+            details_specific = {
+                'type_probleme': divers_details.type_probleme,
+                'description_probleme': divers_details.description_probleme
+            }
+        except Reclamation.divers_details.RelatedObjectDoesNotExist:
+            pass
+
+    context['reclamation_details_specific'] = details_specific
+
+    html_string = render_to_string('rapports/intervention_rapport.html', context)
+    pdf_file = io.BytesIO()
+    HTML(string=html_string).write_pdf(pdf_file)
+    pdf_file.seek(0)
+    
+    return ContentFile(pdf_file.read(), name=f'rapport_intervention_{intervention.id}.pdf')
+
+def generate_intervention_pdf_response(intervention: Intervention) -> HttpResponse:
+    """
+    Génère la réponse HTTP contenant le PDF du rapport d'intervention
+    """
+    # Vérifier si un rapport existe déjà
+    if intervention.rapport_pdf:
+        intervention.rapport_pdf.open('rb')
+        pdf_content = intervention.rapport_pdf.read()
+        intervention.rapport_pdf.close()
+    else:
+        # Générer le PDF
+        pdf_content_file = generate_intervention_pdf(intervention)
+        pdf_content = pdf_content_file.read()
+        
+        # Sauvegarder le rapport dans la base de données
+        intervention.rapport_pdf.save(
+            f'rapport_intervention_{intervention.id}.pdf',
+            pdf_content_file,
+            save=True
+        )
+
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="rapport_intervention_{intervention.id}.pdf"'
+    return response
+
+class CompleteInterventionReportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        intervention = get_object_or_404(Intervention, pk=pk)
+
+        if request.user != intervention.technicien and not request.user.is_staff:
+            return Response({'detail': 'Vous n\'avez pas la permission de compléter cette intervention.'},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        if intervention.reclamation.status == 'termine':
+            return Response({'detail': 'La réclamation associée est déjà terminée.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Mettre à jour les données du rapport si elles sont fournies
+        report_data = request.data.get('report_data', {})
+        if report_data:
+            serializer = InterventionReportDataSerializer(intervention, data=report_data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Terminer l'intervention
+        intervention.terminer()
+        
+        # Générer et sauvegarder le rapport PDF
+        if not intervention.rapport_pdf:
+            pdf_content = generate_intervention_pdf(intervention)
+            intervention.rapport_pdf.save(
+                f'rapport_intervention_{intervention.id}.pdf',
+                pdf_content,
+                save=True
+            )
+        
+        # Retourner le rapport en réponse
+        pdf_response = generate_intervention_pdf_response(intervention)
+        return pdf_response
 
 class InterventionViewSet(viewsets.ModelViewSet):
-    """
-    CRUD complet pour les interventions
-    """
     queryset = Intervention.objects.all()
     serializer_class = InterventionSerializer
     permission_classes = [IsAuthenticated]
-    
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        reclamation_id = self.request.query_params.get('reclamation', None)
+        if reclamation_id is not None:
+            queryset = queryset.filter(reclamation_id=reclamation_id)
+        return queryset
+
     def perform_create(self, serializer):
-        # Associer le technicien actuel à l'intervention
-        serializer.save(technicien=self.request.user)
+        # Enregistrer l'intervention avec le fichier joint si présent
+        intervention = serializer.save(technicien=self.request.user)
+        
+        # Si un fichier est présent dans les données, l'enregistrer
+        fichier_joint = self.request.FILES.get('fichier_joint')
+        if fichier_joint:
+            intervention.fichier_joint = fichier_joint
+            intervention.save()
 
 class UserInterventionsView(generics.ListAPIView):
-    """
-    Liste les interventions effectuées par un technicien spécifique
-    """
     serializer_class = InterventionSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         user_id = self.kwargs.get('user_id')
         return Intervention.objects.filter(technicien_id=user_id)
 
-class FinirInterventionView(APIView):
-    """
-    Marquer une intervention comme terminée
-    """
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, intervention_id):
-        intervention = get_object_or_404(Intervention, id=intervention_id)
-        
-        # Vérifier que l'utilisateur est le technicien assigné
-        if intervention.technicien != request.user:
-            return Response(
-                {"error": "Vous n'êtes pas autorisé à modifier cette intervention"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-            
-        # Mettre à jour l'intervention
-        intervention.status = 'terminee'
-        intervention.date_fin = timezone.now()
-        intervention.save()  # Le signal dans save() mettra à jour la réclamation
-        
-        return Response(
-            {"message": "Intervention marquée comme terminée avec succès"},
-            status=status.HTTP_200_OK
-        )
-
-class GenererRapportView(APIView):
-    """
-    Générer un rapport PDF à partir d'une intervention
-    """
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request):
-        serializer = RapportInterventionSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            intervention = serializer.validated_data['intervention_id']
-            
-            # Préparer les données du contexte pour le template
-            context = {
-                'intervention': intervention,
-                'date_rapport': timezone.now().strftime('%d/%m/%Y'),
-                'technicien_nom': f"{intervention.technicien.first_name} {intervention.technicien.last_name}",
-                'reclamation': intervention.reclamation,
-                'date_debut': intervention.date_debut.strftime('%d/%m/%Y'),
-                'date_fin': intervention.date_fin.strftime('%d/%m/%Y') if intervention.date_fin else 'En cours'
-            }
-            
-            # Générer le HTML à partir du template
-            html_string = render_to_string('rapports/intervention_rapport.html', context)
-            
-            # Convertir le HTML en PDF en utilisant BytesIO
-            pdf_file = io.BytesIO()
-            HTML(string=html_string).write_pdf(pdf_file)
-            pdf_file.seek(0)
-            
-            # Créer une réponse HTTP avec le contenu PDF
-            response = HttpResponse(pdf_file.read(), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="rapport_intervention_{intervention.id}.pdf"'
-            return response
-                
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-class FinirInterventionView(APIView):
-    """
-    Marquer une intervention comme terminée et mettre à jour le statut de la réclamation
-    """
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, intervention_id):
-        intervention = get_object_or_404(Intervention, id=intervention_id)
-        
-        # Vérifier que l'utilisateur est le technicien assigné
-        if intervention.technicien != request.user:
-            return Response(
-                {"error": "Vous n'êtes pas autorisé à modifier cette intervention"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Mettre à jour les données de l'intervention
-        intervention.probleme_constate = request.data.get('probleme_constate', intervention.probleme_constate)
-        intervention.analyse_cause = request.data.get('analyse_cause', intervention.analyse_cause)
-        intervention.actions_entreprises = request.data.get('actions_entreprises', intervention.actions_entreprises)
-        intervention.pieces_remplacees = request.data.get('pieces_remplacees', intervention.pieces_remplacees)
-        intervention.resultat_tests = request.data.get('resultat_tests', intervention.resultat_tests)
-        intervention.recommandations = request.data.get('recommandations', intervention.recommandations)
-        intervention.mots_cles = request.data.get('mots_cles', intervention.mots_cles)
-        
-        # Terminer l'intervention (cette méthode met également à jour le statut de la réclamation)
-        intervention.terminer()
-        
-        return Response(
-            {
-                "message": "Intervention marquée comme terminée avec succès",
-                "intervention": InterventionSerializer(intervention).data
-            },
-            status=status.HTTP_200_OK
-        )
-    
 class CreateInterventionView(APIView):
-    """
-    Vue pour créer une intervention liée à une réclamation
-    """
     permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-    
-    def post(self, request, reclamation_id):
+
+    def post(self, request, reclamation_id=None):
+        # Si reclamation_id est fourni dans l'URL, l'utiliser
+        if reclamation_id:
+            request.data['reclamation'] = reclamation_id
+        else:
+            reclamation_id = request.data.get('reclamation')
+
+        if not reclamation_id:
+            return Response(
+                {"error": "ID de réclamation manquant dans les données de la requête."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if isinstance(reclamation_id, str):
+            try:
+                reclamation_id = int(reclamation_id)
+            except ValueError:
+                return Response(
+                    {"error": "ID de réclamation invalide."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         reclamation = get_object_or_404(Reclamation, id=reclamation_id)
-        
-        # Préparer les données pour l'intervention
+
+        if reclamation.status == 'termine':
+            return Response(
+                {"error": "Cette réclamation est déjà terminée."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         data = request.data.copy()
-        data['reclamation'] = reclamation_id
         data['technicien'] = request.user.id
-        
-        # Créer l'intervention
+
         serializer = InterventionSerializer(data=data)
-        
+
         if serializer.is_valid():
-            intervention = serializer.save()
+            intervention = serializer.save(technicien=request.user)
             
-            # Mettre à jour le statut de la réclamation à "en_cours"
+            # Traiter le fichier joint s'il est présent
+            fichier_joint = request.FILES.get('fichier_joint')
+            if fichier_joint:
+                intervention.fichier_joint = fichier_joint
+                intervention.save()
+                
+            # Mettre à jour le statut de la réclamation
             reclamation.status = 'en_cours'
             reclamation.save()
             
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-class UpdateReclamationStatusView(APIView):
-    """
-    Vue pour mettre à jour le statut d'une réclamation
-    """
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-    
-    def put(self, request, reclamation_id):
-        reclamation = get_object_or_404(Reclamation, id=reclamation_id)
-        
-        # Vérifier que l'utilisateur est autorisé (propriétaire de la réclamation ou admin)
-        if reclamation.user != request.user and not request.user.is_staff:
-            return Response(
-                {"error": "Vous n'êtes pas autorisé à modifier cette réclamation"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Récupérer le nouveau statut
-        new_status = request.data.get('status')
-        
-        # Vérifier que le statut est valide
-        if new_status not in [choice[0] for choice in Reclamation.STATUS_CHOICES]:
-            return Response(
-                {"error": f"Statut invalide. Les statuts valides sont: {[choice[0] for choice in Reclamation.STATUS_CHOICES]}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Mettre à jour le statut
-        reclamation.status = new_status
-        reclamation.save()
-        
-        # Sérialiser et retourner la réclamation mise à jour
-        serializer = ReclamationSerializer(reclamation)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-class ReclamationDetailView(APIView):
-    """
-    Vue pour récupérer les détails d'une réclamation spécifique
-    """
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-    
-    def get(self, request, reclamation_id):
-        reclamation = get_object_or_404(Reclamation, id=reclamation_id)
-        
-        # Vérifier que l'utilisateur est autorisé (technicien assigné ou admin)
-        if not request.user.is_staff and reclamation.user != request.user:
-            return Response(
-                {"error": "Vous n'êtes pas autorisé à accéder à cette réclamation"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Sérialiser et retourner la réclamation
-        serializer = ReclamationSerializer(reclamation)
-        return Response(serializer.data, status=status.HTTP_200_OK)
