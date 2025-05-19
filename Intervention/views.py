@@ -226,3 +226,11 @@ class CreateInterventionView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class OtherUsersInterventionsView(generics.ListAPIView):
+    serializer_class = InterventionSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Exclusion des interventions de l'utilisateur connecté
+        return Intervention.objects.exclude(technicien=self.request.user)

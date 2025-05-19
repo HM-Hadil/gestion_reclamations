@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     CompleteInterventionReportView,
     InterventionViewSet,
+    OtherUsersInterventionsView,
     UserInterventionsView,
     CreateInterventionView,
 )
@@ -23,7 +24,10 @@ urlpatterns = [
     # URL pour créer une intervention (deux versions, avec et sans ID de réclamation dans l'URL)
     path('interventions/create/', CreateInterventionView.as_view(), name='create-intervention'),
     path('interventions/create/<int:reclamation_id>/', CreateInterventionView.as_view(), name='create-intervention-with-id'),
-    
+    # URL pour obtenir les interventions des autres utilisateurs
+    path('interventions/others/', OtherUsersInterventionsView.as_view(), name='other-users-interventions'),
+  
     # Inclure les routes du router pour les opérations CRUD standard
     path('', include(router.urls)),
+
 ]
