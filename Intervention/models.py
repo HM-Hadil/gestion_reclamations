@@ -1,9 +1,9 @@
+# interventions/models.py
 from django.db import models
 from gestion_reclamations import settings
-from reclamations.models import Reclamation  # Import Reclamation from reclamations app, not from .models
+from reclamations.models import Reclamation # Import Reclamation from reclamations app
 
 class Intervention(models.Model):
-    """Modèle pour gérer les interventions sur les réclamations"""
     reclamation = models.ForeignKey(
         Reclamation,
         on_delete=models.CASCADE,
@@ -17,7 +17,7 @@ class Intervention(models.Model):
     description = models.TextField(blank=True, null=True)
     date_debut = models.DateTimeField(auto_now_add=True)
     date_fin = models.DateTimeField(null=True, blank=True)
-    
+
     ACTION_CHOICES = [
         ('diagnostique', 'Diagnostique'),
         ('reparation', 'Réparation'),
@@ -30,9 +30,8 @@ class Intervention(models.Model):
         null=True,
         blank=True
     )
-    
-    # Nouveaux champs pour le rapport d'intervention
-    probleme_constate = models.TextField(blank=True, null=True, 
+
+    probleme_constate = models.TextField(blank=True, null=True,
         help_text="Description détaillée du problème constaté lors de l'intervention")
     analyse_cause = models.TextField(blank=True, null=True,
         help_text="Analyse et cause identifiée du problème")
@@ -50,16 +49,13 @@ class Intervention(models.Model):
         help_text="Fichier joint à l'intervention (photos, diagnostics, etc.)")
     rapport_pdf = models.FileField(upload_to='interventions/rapports/', blank=True, null=True,
         help_text="Rapport PDF généré de l'intervention")
-    
+
     def __str__(self):
         return f"Intervention #{self.id} - Réclamation #{self.reclamation.id}"
-    
+
     def terminer(self):
-        """Marquer l'intervention comme terminée"""
         from django.utils import timezone
         self.date_fin = timezone.now()
         self.save()
-        
-        # Mettre à jour le statut de la réclamation
         self.reclamation.status = 'termine'
         self.reclamation.save()

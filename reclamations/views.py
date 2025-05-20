@@ -404,3 +404,32 @@ class AnalyseStatistiqueView(APIView):
         }
         
         return Response(response_data)
+class AllReclamationsFilterView(generics.ListAPIView):
+    """
+    Vue pour filtrer TOUTES les réclamations (sans restriction par utilisateur)
+    selon différents critères.
+    """
+    serializer_class = ReclamationSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication] # Keep if authentication is required for all reclamations
+
+    def get_queryset(self):
+        # Start with all Reclamation objects
+        queryset = Reclamation.objects.all()
+
+        # Possible filters (same as your existing view)
+        lieu = self.request.query_params.get('lieu', None)
+        category = self.request.query_params.get('category', None)
+        statut = self.request.query_params.get('statut', None)
+        
+        if lieu:
+            queryset = queryset.filter(lieu=lieu)
+        
+        if category:
+            queryset = queryset.filter(category=category)
+        
+        if statut:
+            # Ensure 'statut' here matches the field name in your Reclamation model
+            queryset = queryset.filter(status=statut) # Assuming the field is 'status' not 'statut' based on typical Django conventions
+
+        return queryset

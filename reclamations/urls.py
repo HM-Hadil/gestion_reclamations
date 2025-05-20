@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
+    AllReclamationsFilterView,
     ReclamationCreateView,
     ReclamationDetailView,
     ReclamationListView,
@@ -33,6 +34,7 @@ urlpatterns = [
     path('filter/', ReclamationFilterView.as_view(), name='reclamation-filter'),
     path('statistics/', ReclamationStatisticsView.as_view(), name='reclamation-statistics'),
     path('analyse-statistique/', AnalyseStatistiqueView.as_view(), name='analyse-statistique'),
+    path('reclamations/all_filtered/', AllReclamationsFilterView.as_view(), name='all-reclamations-filtered'),
 
 
     path('user/<int:user_id>/', UserReclamationsView.as_view(), name='user-reclamations'),

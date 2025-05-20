@@ -1,4 +1,5 @@
 import io
+from itertools import count
 import os
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -17,11 +18,10 @@ from weasyprint import HTML
 
 from .models import Intervention
 from reclamations.models import Reclamation
-from .serializer import InterventionSerializer, InterventionReportDataSerializer
+from .serializer import InterventionSerializer, InterventionReportDataSerializer, UserSerializer
 from reclamations.serializers import ReclamationSerializer
 
 User = get_user_model()
-
 def generate_intervention_pdf(intervention: Intervention):
     """
     Génère le PDF du rapport d'intervention et le retourne en tant que ContentFile
@@ -75,24 +75,21 @@ def generate_intervention_pdf(intervention: Intervention):
     pdf_file = io.BytesIO()
     HTML(string=html_string).write_pdf(pdf_file)
     pdf_file.seek(0)
-    
+
     return ContentFile(pdf_file.read(), name=f'rapport_intervention_{intervention.id}.pdf')
 
 def generate_intervention_pdf_response(intervention: Intervention) -> HttpResponse:
     """
     Génère la réponse HTTP contenant le PDF du rapport d'intervention
     """
-    # Vérifier si un rapport existe déjà
     if intervention.rapport_pdf:
         intervention.rapport_pdf.open('rb')
         pdf_content = intervention.rapport_pdf.read()
         intervention.rapport_pdf.close()
     else:
-        # Générer le PDF
         pdf_content_file = generate_intervention_pdf(intervention)
         pdf_content = pdf_content_file.read()
-        
-        # Sauvegarder le rapport dans la base de données
+
         intervention.rapport_pdf.save(
             f'rapport_intervention_{intervention.id}.pdf',
             pdf_content_file,
@@ -117,7 +114,6 @@ class CompleteInterventionReportView(APIView):
             return Response({'detail': 'La réclamation associée est déjà terminée.'},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        # Mettre à jour les données du rapport si elles sont fournies
         report_data = request.data.get('report_data', {})
         if report_data:
             serializer = InterventionReportDataSerializer(intervention, data=report_data, partial=True)
@@ -125,11 +121,9 @@ class CompleteInterventionReportView(APIView):
                 serializer.save()
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Terminer l'intervention
+
         intervention.terminer()
-        
-        # Générer et sauvegarder le rapport PDF
+
         if not intervention.rapport_pdf:
             pdf_content = generate_intervention_pdf(intervention)
             intervention.rapport_pdf.save(
@@ -137,8 +131,7 @@ class CompleteInterventionReportView(APIView):
                 pdf_content,
                 save=True
             )
-        
-        # Retourner le rapport en réponse
+
         pdf_response = generate_intervention_pdf_response(intervention)
         return pdf_response
 
@@ -155,10 +148,8 @@ class InterventionViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        # Enregistrer l'intervention avec le fichier joint si présent
         intervention = serializer.save(technicien=self.request.user)
-        
-        # Si un fichier est présent dans les données, l'enregistrer
+
         fichier_joint = self.request.FILES.get('fichier_joint')
         if fichier_joint:
             intervention.fichier_joint = fichier_joint
@@ -176,7 +167,6 @@ class CreateInterventionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, reclamation_id=None):
-        # Si reclamation_id est fourni dans l'URL, l'utiliser
         if reclamation_id:
             request.data['reclamation'] = reclamation_id
         else:
@@ -212,25 +202,63 @@ class CreateInterventionView(APIView):
 
         if serializer.is_valid():
             intervention = serializer.save(technicien=request.user)
-            
-            # Traiter le fichier joint s'il est présent
+
             fichier_joint = request.FILES.get('fichier_joint')
             if fichier_joint:
                 intervention.fichier_joint = fichier_joint
                 intervention.save()
-                
-            # Mettre à jour le statut de la réclamation
+
             reclamation.status = 'en_cours'
             reclamation.save()
-            
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 class OtherUsersInterventionsView(generics.ListAPIView):
     serializer_class = InterventionSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Exclusion des interventions de l'utilisateur connecté
         return Intervention.objects.exclude(technicien=self.request.user)
+
+class AllInterventionsView(generics.ListAPIView):
+    queryset = Intervention.objects.all()
+    serializer_class = InterventionSerializer
+    permission_classes = [IsAuthenticated]
+
+class InterventionStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        queryset = Intervention.objects.all()
+        
+        # Filter by technician if technician_id is provided in query params
+        technician_id = request.query_params.get('technician_id', None)
+        if technician_id:
+            try:
+                technician_id = int(technician_id)
+                queryset = queryset.filter(technicien_id=technician_id)
+            except ValueError:
+                return Response({"error": "Invalid technician_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+        total_interventions = queryset.count()
+
+        # Get technician distribution
+        technician_distribution = queryset.values('technicien').annotate(count=count('technicien'))
+        technician_stats = {str(item['technicien']): item['count'] for item in technician_distribution}
+
+        # Get status distribution
+        status_distribution = queryset.values('reclamation__status').annotate(count=count('reclamation__status'))
+        status_stats = {item['reclamation__status']: item['count'] for item in status_distribution}
+
+        # Get data for all technicians (for dropdown)
+        all_technicians = User.objects.filter(is_staff=True) # Assuming technicians are staff users
+        technicians_data = UserSerializer(all_technicians, many=True).data
+
+        return Response({
+            'total_interventions': total_interventions,
+            'technician_distribution': technician_stats,
+            'status_distribution': status_stats,
+            'technicians_data': technicians_data, # Include full technician data
+        }, status=status.HTTP_200_OK)
