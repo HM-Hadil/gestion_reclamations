@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     AllReclamationsFilterView,
+    PCsByLaboratoireView,  # Remplace EquipementsByLaboratoireView
     ReclamationCreateView,
     ReclamationDetailView,
     ReclamationListView,
@@ -16,8 +17,13 @@ from .views import (
     ReclamationsTermineesView,
     DeleteReclamationView,
     UserReclamationsByStatusView,
-    AnalyseStatistiqueView
-
+    AnalyseStatistiqueView,
+    CreatePCView,
+    PCDetailView,
+    PCListView,
+    ReclamationsByPCView,
+    StatistiquesPCView,
+    LaboratoireListView
 )
 
 # Router pour les viewsets
@@ -36,7 +42,18 @@ urlpatterns = [
     path('analyse-statistique/', AnalyseStatistiqueView.as_view(), name='analyse-statistique'),
     path('reclamations/all_filtered/', AllReclamationsFilterView.as_view(), name='all-reclamations-filtered'),
 
+    # URLs pour les PCs (remplace les équipements)
+    path('laboratoires/<int:laboratoire_id>/pcs/', PCsByLaboratoireView.as_view(), name='pcs-by-laboratoire'),
+    path('pcs/create/', CreatePCView.as_view(), name='create-pc'),
+    path('pcs/<int:pk>/', PCDetailView.as_view(), name='pc-detail'),
+    path('pcs/', PCListView.as_view(), name='pc-list'),
+    path('pcs/<int:pc_id>/reclamations/', ReclamationsByPCView.as_view(), name='reclamations-by-pc'),
+    path('pcs/statistics/', StatistiquesPCView.as_view(), name='statistiques-pc'),
+    
+    # URLs pour les laboratoires
+    path('laboratoires/', LaboratoireListView.as_view(), name='laboratoire-list'),
 
+    # URLs pour les réclamations par utilisateur et statut
     path('user/<int:user_id>/', UserReclamationsView.as_view(), name='user-reclamations'),
     path('status/en-attente/', ReclamationsEnAttenteView.as_view(), name='reclamations-en-attente'),
     path('status/en-cours/', ReclamationsEnCoursView.as_view(), name='reclamations-en-cours'),

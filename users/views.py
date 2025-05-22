@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -35,15 +35,17 @@ class LoginView(generics.GenericAPIView):
     
 # Récupérer les informations d'un utilisateur par ID (Retrieve user details by ID)
 class UserDetailView(generics.RetrieveAPIView):
+    queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]  # Ajout de la permission
+    lookup_field = 'pk'  # Utilise l'ID depuis l'URL
     
-    def get_queryset(self):
-        return User.objects.filter(id=self.request.user.id)
-    
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        return context
+    def get_object(self):
+        """
+        Récupère l'utilisateur par son ID depuis l'URL
+        """
+        user_id = self.kwargs.get('pk')
+        return get_object_or_404(User, id=user_id)
 
 # Update user view
 class UserUpdateView(UpdateAPIView):

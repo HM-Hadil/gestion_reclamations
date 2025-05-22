@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
+from django.db.models import Count, Q
 
 from rest_framework import generics, viewsets, status
 from rest_framework.views import APIView
@@ -22,6 +23,7 @@ from .serializer import InterventionSerializer, InterventionReportDataSerializer
 from reclamations.serializers import ReclamationSerializer
 
 User = get_user_model()
+
 def generate_intervention_pdf(intervention: Intervention):
     """
     Génère le PDF du rapport d'intervention et le retourne en tant que ContentFile
@@ -227,6 +229,7 @@ class AllInterventionsView(generics.ListAPIView):
     serializer_class = InterventionSerializer
     permission_classes = [IsAuthenticated]
 
+
 class InterventionStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -243,22 +246,36 @@ class InterventionStatsView(APIView):
                 return Response({"error": "Invalid technician_id"}, status=status.HTTP_400_BAD_REQUEST)
 
         total_interventions = queryset.count()
+        
+        # Get count of completed interventions based on date_fin field
+        # Une intervention est terminée si elle a une date_fin
+        completed_interventions = queryset.filter(date_fin__isnull=False).count()
+        
+        # Get count of non-completed interventions
+        non_completed_interventions = queryset.filter(date_fin__isnull=True).count()
 
         # Get technician distribution
-        technician_distribution = queryset.values('technicien').annotate(count=count('technicien'))
+        technician_distribution = queryset.values('technicien').annotate(count=Count('technicien'))
         technician_stats = {str(item['technicien']): item['count'] for item in technician_distribution}
 
-        # Get status distribution
-        status_distribution = queryset.values('reclamation__status').annotate(count=count('reclamation__status'))
+        # Get status distribution based on reclamation status
+        status_distribution = queryset.values('reclamation__status').annotate(count=Count('reclamation__status'))
         status_stats = {item['reclamation__status']: item['count'] for item in status_distribution}
+        
+        # Status summary based on intervention completion (date_fin)
+        status_summary = {
+            'completed': completed_interventions,
+            'non_completed': non_completed_interventions
+        }
 
         # Get data for all technicians (for dropdown)
-        all_technicians = User.objects.filter(is_staff=True) # Assuming technicians are staff users
+        all_technicians = User.objects.filter(is_staff=True)  # Assuming technicians are staff users
         technicians_data = UserSerializer(all_technicians, many=True).data
 
         return Response({
             'total_interventions': total_interventions,
             'technician_distribution': technician_stats,
             'status_distribution': status_stats,
-            'technicians_data': technicians_data, # Include full technician data
+            'status_summary': status_summary,
+            'technicians_data': technicians_data,
         }, status=status.HTTP_200_OK)

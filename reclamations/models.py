@@ -11,23 +11,30 @@ class Laboratoire(models.Model):
     def __str__(self):
         return self.nom
 
-class Equipement(models.Model):
-    """Modèle pour gérer les équipements dans un laboratoire"""
+class PC(models.Model):
+    poste = models.CharField(max_length=255, unique=True, verbose_name="Poste")
+    sn_inventaire = models.CharField(max_length=100, unique=True, verbose_name="S/N Inventaire")
+    logiciels_installes = models.TextField(verbose_name="Logiciels Installés", blank=True)
+    ecran = models.CharField(max_length=255, verbose_name="Écran", blank=True)
     laboratoire = models.ForeignKey(
-        Laboratoire, 
-        on_delete=models.CASCADE, 
-        related_name='equipements'
+        Laboratoire,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pcs',
+        verbose_name="Laboratoire"
     )
-    TYPE_CHOICES = [
-        ('pc', 'Ordinateur'),
-        ('electrique', 'Équipement Électrique'),
-        ('divers', 'Équipement Divers')
-    ]
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-    identificateur = models.CharField(max_length=50, verbose_name="Identifiant de l'équipement")  # Fixed here
     
     def __str__(self):
-        return f"{self.identificateur} - {self.get_type_display()} ({self.laboratoire.nom})"
+        return f"PC {self.poste} - {self.sn_inventaire}"
+    
+    class Meta:
+        verbose_name = "PC"
+        verbose_name_plural = "PCs"
+        db_table = 'gestion_pc'  # Utilise la table existante
+
+# Suppression du modèle Equipement - on utilise directement PC
+# class Equipement(models.Model): # SUPPRIMÉ
 
 class Reclamation(models.Model):
     """Modèle principal pour les réclamations"""
@@ -43,7 +50,6 @@ class Reclamation(models.Model):
         ('divers', 'Problèmes Divers')
     ]
 
-     
     STATUS_CHOICES = [
         ('en_attente', 'En attente'),
         ('en_cours', 'En cours'),
@@ -62,11 +68,13 @@ class Reclamation(models.Model):
         null=True, 
         blank=True
     )
-    equipement = models.ForeignKey(
-        Equipement, 
+    # Remplacer equipement par pc
+    pc = models.ForeignKey(
+        PC, 
         on_delete=models.SET_NULL, 
         null=True, 
-        blank=True
+        blank=True,
+        related_name='reclamations'
     )
     category = models.CharField(
         max_length=10, 

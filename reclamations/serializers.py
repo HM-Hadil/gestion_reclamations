@@ -3,13 +3,21 @@ from .models import (
     Reclamation, 
     ReclamationPC, 
     ReclamationElectrique, 
-    ReclamationDivers
+    ReclamationDivers,
+    PC,
+    Laboratoire
 )
 
+class PCSerializer(serializers.ModelSerializer):
+    """Serializer pour les PCs"""
+    laboratoire_nom = serializers.CharField(source='laboratoire.nom', read_only=True)
+    
+    class Meta:
+        model = PC
+        fields = ['id', 'poste', 'sn_inventaire', 'logiciels_installes', 'ecran', 'laboratoire', 'laboratoire_nom']
+
 class ReclamationPCSerializer(serializers.ModelSerializer):
-    """
-    Serializer for ReclamationPC model
-    """
+    """Serializer for ReclamationPC model"""
     autre_materiel = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     autre_logiciel = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
@@ -17,16 +25,12 @@ class ReclamationPCSerializer(serializers.ModelSerializer):
         model = ReclamationPC
         fields = '__all__'
         extra_kwargs = {
-            'details_probleme': {'required': False},
-            'materiel': {'required': False},
-            'logiciel': {'required': False},
+            'description_probleme': {'required': False},
             'reclamation': {'required': False} 
         }
 
 class ReclamationElectriqueSerializer(serializers.ModelSerializer):
-    """
-    Serializer for ReclamationElectrique model
-    """
+    """Serializer for ReclamationElectrique model"""
     autre_etat_climatiseur = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
@@ -34,13 +38,11 @@ class ReclamationElectriqueSerializer(serializers.ModelSerializer):
         fields = '__all__'
         extra_kwargs = {
             'description_probleme': {'required': False},
-            'etat_climatiseur': {'required': False},
-            'reclamation': {'required': False}  # Add this line
+            'reclamation': {'required': False}
         }
+
 class ReclamationDiversSerializer(serializers.ModelSerializer):
-    """
-    Serializer for ReclamationDivers model
-    """
+    """Serializer for ReclamationDivers model"""
     autre_etat_equipement = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
@@ -48,31 +50,35 @@ class ReclamationDiversSerializer(serializers.ModelSerializer):
         fields = '__all__'
         extra_kwargs = {
             'description_probleme': {'required': False},
-            'etat_equipement': {'required': False},
             'reclamation': {'required': False} 
         }
 
 class ReclamationSerializer(serializers.ModelSerializer):
-    """
-    Main Reclamation serializer with nested detail serializers
-    """
+    """Main Reclamation serializer with nested detail serializers"""
     pc_details = ReclamationPCSerializer(required=False, allow_null=True)
     electrique_details = ReclamationElectriqueSerializer(required=False, allow_null=True)
     divers_details = ReclamationDiversSerializer(required=False, allow_null=True)
+    pcs_disponibles = serializers.SerializerMethodField()
+    pc_info = PCSerializer(source='pc', read_only=True)
+    laboratoire_nom = serializers.CharField(source='laboratoire.nom', read_only=True)
 
     class Meta:
         model = Reclamation
         fields = '__all__'
         extra_kwargs = {
             'description_generale': {'required': False},
-            'lieu_specifique': {'required': True},
             'status': {'required': False} 
         }
+    
+    def get_pcs_disponibles(self, obj):
+        """Retourne les PCs disponibles pour le laboratoire sélectionné"""
+        if obj.laboratoire:
+            pcs = PC.objects.filter(laboratoire=obj.laboratoire)
+            return PCSerializer(pcs, many=True).data
+        return []
 
     def create(self, validated_data):
-        """
-        Custom create method to handle nested serializers
-        """
+        """Custom create method to handle nested serializers and PC assignment"""
         # Extract nested serializer data
         pc_details = validated_data.pop('pc_details', None)
         electrique_details = validated_data.pop('electrique_details', None)
@@ -80,6 +86,10 @@ class ReclamationSerializer(serializers.ModelSerializer):
 
         # Create the main Reclamation instance
         reclamation = Reclamation.objects.create(**validated_data)
+
+        # Assigner automatiquement le PC si c'est une réclamation PC et aucun PC n'est spécifié
+        if reclamation.category == 'pc' and not reclamation.pc and reclamation.laboratoire:
+            self.assigner_pc_automatique(reclamation)
 
         # Create associated details based on category
         try:
@@ -98,49 +108,40 @@ class ReclamationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Error creating associated details: {str(e)}")
 
         return reclamation
+    
+    def assigner_pc_automatique(self, reclamation):
+        """Assigne automatiquement un PC du laboratoire (optionnel)"""
+        if not reclamation.pc and reclamation.laboratoire:
+            # Prendre le premier PC disponible du laboratoire
+            pc = PC.objects.filter(laboratoire=reclamation.laboratoire).first()
+            if pc:
+                reclamation.pc = pc
+                reclamation.save()
 
     def validate(self, data):
-        """
-        Additional validation to ensure correct details are provided based on category
-        """
+        """Additional validation to ensure correct details are provided based on category"""
         category = data.get('category')
         
-        # Validate PC details
+        # Validation spécifique pour les réclamations PC
         if category == 'pc':
             pc_details = data.get('pc_details')
             if not pc_details:
                 raise serializers.ValidationError("PC details are required for PC category")
             
-            type_probleme = pc_details.get('type_probleme')
-            if type_probleme == 'materiel':
-                materiel = pc_details.get('materiel')
-                if materiel == 'autre' and not pc_details.get('autre_materiel'):
-                    raise serializers.ValidationError("'autre_materiel' is required when materiel is 'autre'")
-            
-            if type_probleme == 'logiciel':
-                logiciel = pc_details.get('logiciel')
-                if logiciel == 'autre' and not pc_details.get('autre_logiciel'):
-                    raise serializers.ValidationError("'autre_logiciel' is required when logiciel is 'autre'")
+            # Vérifier qu'un PC est spécifié ou qu'un laboratoire est fourni
+            if not data.get('pc') and not data.get('laboratoire'):
+                raise serializers.ValidationError("Either a specific PC or a laboratory must be specified for PC complaints")
         
         # Validate Electrique details
         elif category == 'electrique':
             electrique_details = data.get('electrique_details')
             if not electrique_details:
                 raise serializers.ValidationError("Electrique details are required for Electrique category")
-            
-            if electrique_details.get('type_probleme') == 'climatiseur':
-                etat_climatiseur = electrique_details.get('etat_climatiseur')
-                if etat_climatiseur == 'autre' and not electrique_details.get('autre_etat_climatiseur'):
-                    raise serializers.ValidationError("'autre_etat_climatiseur' is required when etat_climatiseur is 'autre'")
         
         # Validate Divers details
         elif category == 'divers':
             divers_details = data.get('divers_details')
             if not divers_details:
                 raise serializers.ValidationError("Divers details are required for Divers category")
-            
-            etat_equipement = divers_details.get('etat_equipement')
-            if etat_equipement == 'autre' and not divers_details.get('autre_etat_equipement'):
-                raise serializers.ValidationError("'autre_etat_equipement' is required when etat_equipement is 'autre'")
         
         return data

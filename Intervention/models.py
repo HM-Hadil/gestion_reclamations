@@ -1,8 +1,7 @@
 # interventions/models.py
 from django.db import models
 from gestion_reclamations import settings
-from reclamations.models import Reclamation # Import Reclamation from reclamations app
-
+from reclamations.models import Reclamation
 class Intervention(models.Model):
     reclamation = models.ForeignKey(
         Reclamation,
